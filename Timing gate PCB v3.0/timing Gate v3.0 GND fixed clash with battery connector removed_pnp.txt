@@ -1,0 +1,65 @@
+*Pick And Place List
+*Company=
+*Author=
+*eMail=
+*
+*Project=timing Gate v3.0 GND fixed clash with battery connector removed
+*Date=19:28:17
+*CreatedBy=Fritzing 0.9.6b.2021-02-21.CD-175-0-8a1e0682
+*
+*
+*Coordinates in mm, always center of component
+*Origin 0/0=Lower left corner of PCB
+*Rotation in degree (0-360, math. pos.)
+*
+*No;Value;Package;X;Y;Rotation;Side;Name
+1;;;3.09041;-38.745;0;Bottom;TXT3
+2;;;48.221;-7.42413;90;Bottom;TXT3
+3;;THT;52.2368;-10.4846;90;Bottom;J4: LDC Display
+4;;THT;89.0668;-4.13464;0;Bottom;J3 Right Gate LED
+5;;;92.4904;-2.15646;0;Bottom;TXT3
+6;;;96.6869;-58.7446;0;Bottom;Hole1
+7;;THT;19.2168;-16.92;0;Bottom;U2 Right Gate
+8;;;37.8123;-10.6739;0;Bottom;TXT3
+9;;;73.5993;-32.0746;180;Bottom;Adafruit Feather M0
+10;;;85.1154;-4.24011;0;Bottom;TXT3
+11;;;72.517;-22.658;0;Bottom;Copper Fill5
+12;;;51.4931;-48.0676;0;Bottom;TXT3
+13;;THT;94.1468;-14.2946;0;Bottom;J2 Left Gate LED
+14;;;3.2318;-18.297;0;Bottom;TXT3
+15;;;47.7127;-50.6012;0;Bottom;TXT3
+16;;;61.6966;-19.9148;0;Bottom;Copper Fill6
+17;;;11.5062;-36.882;0;Bottom;Copper Fill2
+18;;;3.91184;-30.5911;0;Bottom;TXT3
+19;;;50.2666;-30.7098;0;Bottom;Copper Fill1
+20;;THT;19.2168;-37.24;0;Bottom;U1 Left Gate
+21;;THT;80.1768;-2.86464;0;Bottom;J1: Power Enable
+22;;;3.05259;-15.6961;0;Bottom;TXT3
+23;;SIP (Single Inline) [THT];43.3468;-51.1246;0;Bottom;DC-DC Convertor
+24;;;53.7139;-7.63439;90;Bottom;TXT3
+25;;;3.94938;-33.0052;0;Bottom;TXT3
+26;;THT;7.78679;-14.2946;180;Bottom;J4: Right Gate Sensor
+27;1k;THT;10.3268;-46.0446;0;Bottom;R3
+28;;;2.7067;-58.7446;0;Bottom;Hole3
+29;100;THT;78.9068;-15.5646;0;Bottom;R2
+30;;;3.09041;-35.8751;0;Bottom;TXT3
+31;;;37.043;-7.89348;0;Bottom;TXT3
+32;;;3.41118;-10.2255;0;Bottom;TXT3
+33;1k;THT;10.3268;-23.1846;0;Bottom;R4
+34;;;55.1688;-16.3842;0;Bottom;Copper Fill4
+35;;;37.0809;-5.20305;0;Bottom;TXT3
+36;100;THT;78.9068;-10.4846;0;Bottom;R1
+37;;;92.9352;-12.7116;0;Bottom;TXT3
+38;;;52.6796;-16.435;0;Bottom;Copper Fill3
+39;;;96.6869;-2.86455;0;Bottom;Hole2
+40;;buzzer-12mm-ns;77.8641;-51.594;180;Bottom;SG1
+41;;;47.8708;-53.6751;0;Bottom;TXT3
+42;;;3.14222;-12.9159;0;Bottom;TXT3
+43;;;53.4782;-33.3662;0;Bottom;Via1
+44;;;2.70688;-2.86455;0;Bottom;Hole4
+45;;;11.5062;-16.0286;0;Bottom;Copper Fill7
+46;;;50.8702;-7.40709;90;Bottom;TXT3
+47;;;56.1345;-7.47352;90;Bottom;TXT3
+48;;;88.2528;-50.7628;0;Bottom;TXT3
+49;;THT;7.78679;-34.6146;180;Bottom;J4: Left Gate Sensor
+50;;;50.2666;-30.7098;0;Bottom;Copper Fill8
