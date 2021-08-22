@@ -19,9 +19,10 @@ DFRobot_RGBLCD lcd(16,2);  //16 characters and 2 lines of show
 int left_gate_pin = 10;    // the number of the pin for left gate
 int right_gate_pin = 11;  // number of pin for right gate
 int i = 0;
+#define speakerPin A3
 int ledPin[2] =  {5, 6}; //LEFT, RIGHT
 int ledState[2] = {LOW, LOW};
-#define speakerPin A3
+
 int interupt_test_pin = 12;
 const int initcolorR = 255;
 const int initcolorG = 255;
@@ -38,7 +39,8 @@ int debounce = 50;
 bool pullup = true;
 bool invert = true;
 int gate_high_delay = 200;
-int presses_init = 1;
+int presses_init = 1
+;
 int timeout = 2000;
 int duration = 2000;
 #define VBATPIN A7
@@ -107,7 +109,7 @@ void setup() {
   //u8x8.setCursor(0, 0);
   //u8x8.clearDisplay();
   //u8x8.println("Ready");
-  //lcd.begin(16, 2); // initialize the lcd
+  //elcd.begin(16, 2); // initialize the lcd
   lcd.init();
   lcd.setRGB(initcolorR, initcolorG, initcolorB);
   //lcd.setBacklight(20); //turn on backlight
