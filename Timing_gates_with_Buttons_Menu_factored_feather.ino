@@ -1,12 +1,11 @@
-
 #include <FlashStorage_SAMD.h>
 #include <FlashStorage_SAMD21.h>
 #include <Arduino.h>
 //#include <u8x8lib.h>
 #include <EasyButton.h>
-#include <TimerTC3.h>
 #include "DFRobot_RGBLCD.h"
 //#include <LiquidCrystal_PCF8574.h>
+// This version has been modified to use interupts because the updating the LCD with the run time was causing the processor to miss the second gate.  
 
 
 
@@ -19,6 +18,8 @@ DFRobot_RGBLCD lcd(16, 2); //16 characters and 2 lines of show
 int left_gate_pin = 11;    // the number of the pin for left gate
 int right_gate_pin = 10;  // number of pin for right gate
 int i = 0;
+int last_left_gate = HIGH;
+int last_right_gate = HIGH;
 #define speakerPin A3
 int ledPin[2] =  {5, 6}; //LEFT, RIGHT
 int ledState[2] = {LOW, LOW};
@@ -74,7 +75,7 @@ bool run_once_time_out = false;
 //Control the backlight
 unsigned long batt_last_read = 12000;
 unsigned long back_light_on = 0;
-bool debug = true;
+bool debug = false;
 
 
 //Menu status
@@ -84,24 +85,98 @@ int MenuId = 0;
 unsigned long previousMillis [3] = {0, 0, 0};
 unsigned long currentMillis [3] = {0, 0, 0};
 
-
 EasyButton left_gate(left_gate_pin, debounce, pullup, invert);
 EasyButton right_gate(right_gate_pin, debounce, pullup, invert);
 
 FlashStorage(presses_storage, int);
 FlashStorage(reset_delay_storage, unsigned long);
+
+void left_button_ISR()
+{
+  left_gate.read();
+  if (debug)Serial.println("left Gate interupt");
+}
+
+void right_button_ISR()
+{
+  right_gate.read();
+  if (debug) Serial.println("right Gate interupt");
+}
+
+void left_gate_triggered() //call back from easy button
+{
+   //if (debug){Serial.println("left Gate Triggered");}
+  ////u8x8.setCursor(0, 3);
+  ////u8x8.print("Left");;
+  //tone(speakerPin, frequency,led_interval);
+  //tone(A3, 600, 200);
+  start_time[n_start_time] = millis();
+  ledState[0] = (HIGH);
+  digitalWrite(ledPin[0], ledState[0]);
+  previousMillis[0] = millis();
+  //lcd.setBacklight(60); //turn on back light
+  lcd.setRGB(runcolorR, runcolorG, runcolorB);
+  back_light_on = millis();
+  //if (Serial) Serial.println(n_start_time); if (Serial) Serial.print(start_time[n_start_time]);
+
+  if (n_start_time < 9)
+    n_start_time = n_start_time + 1;
+  else n_start_time = 9;
+}
+
+void right_gate_triggered() //call back from easy button
+{
+  if (debug){Serial.println("Right Gate Triggered");}
+  ////u8x8.setCursor(6, 3);
+  ////u8x8.print("Right");;
+  //tone(speakerPin, frequency,led_interval);
+  //tone(ledPin[2], frequency,led_interval);
+  tone(A3, 440, 200);
+  stop_time[n_stop_time] = millis();
+  ledState[1] = (HIGH);
+  digitalWrite(ledPin[1], ledState[1]);
+  previousMillis[1] = millis();
+  //lcd.setBacklight(125); //turn on back light
+  lcd.setRGB(runcolorR, runcolorG, runcolorB);
+  back_light_on = millis();
+  //if (Serial) Serial.println(n_stop_time);
+  //if (Serial) Serial.println(stop_time[n_stop_time]);
+  if (n_stop_time < 9)
+    n_stop_time = n_stop_time + 1;
+  else n_stop_time = 9;
+}
+
 void setup() {
   if (debug) {
     while (! Serial);
   }
   if (Serial) Serial.begin(9600);
-  if (Serial) Serial.println(F("Starting New Version...."));
+  if (Serial) Serial.println(F("Starting New Version 0.1...."));
   Serial.setTimeout(100000);
   pinMode(LED_BUILTIN, OUTPUT);
+
   tone(A3, 600, 200);
   // initialize the LED pin as an output:
+  //Begin easy button for the gates
+
   left_gate.begin();
   right_gate.begin();
+  // set up the call backs for the gates
+  left_gate.onSequence(presses, timeout, left_gate_triggered);
+  right_gate.onSequence(presses, timeout, right_gate_triggered);
+  // set up the interupts for the interupts for the gates
+  //set up gate interupts
+  if (right_gate.supportsInterrupt())
+  {
+    right_gate.enableInterrupt(right_button_ISR);
+   if (debug){ if (Serial) Serial.println("Button will be used through interrupts");}
+  }
+  if (left_gate.supportsInterrupt())
+  {
+    left_gate.enableInterrupt(left_button_ISR);
+   if (debug){ if (Serial) Serial.println("Button will be used through interrupts");}
+  }
+
   //u8x8.begin();
   //u8x8.setFlipMode(1);   // set number from 1 to 3, the screen word will rotary 180
   //u8x8.setFont(//u8x8_font_chroma48medium8_r);
@@ -126,8 +201,9 @@ void setup() {
   //pinMode(ledPin[2], OUTPUT);
   tone(A3, 600, 200);
   pinMode(interupt_test_pin, OUTPUT);
-  pinMode(left_gate_pin, INPUT_PULLUP);
-  pinMode(right_gate_pin, INPUT_PULLUP);
+
+
+
   //pinMode(back_light_enable, INPUT_PULLUP);
   //digitalWrite(bat_read_pin, HIGH);
   delay(1000);
@@ -141,121 +217,90 @@ void setup() {
   if (presses == 0) presses = presses_init;
   lcd.setCursor(0, 1);
   lcd.print("Trig pulses:"); lcd.print(presses);
-  // Add the callback function to be called when the button is pressed for at least the given time.
-  //left_gate.onSequence(presses, timeout, left_gate_triggered);
-  //right_gate.onSequence(presses, timeout, right_gate_triggered);
-  left_gate.onPressed(left_gate_triggered);
-  right_gate.onPressed(right_gate_triggered);
-  delay(2000);
+  //Add the callback function to be called when the button is pressed for at least the given time.
+
+  //left_gate.onPressed(left_gate_triggered);
+  //right_gate.onPressed(right_gate_triggered);
+  delay(500);
   lcd.home(); lcd.clear();
   lcd.setCursor(0, 0);
-  n_start_time = 0;
-  n_stop_time = 0;
-
+  //n_start_time = 0;
+  //n_stop_time = 0;
+  //read the defaule state of gates
+  //last_left_gate = digitalRead (left_gate_pin);
+  //last_right_gate = digitalRead (right_gate_pin);
 }
 
 void loop() {
   time_now = millis();
-  read_gates();
-  if (debug) {
-    if (Serial) {
-      Serial.print ("n_start_time"); Serial.println(n_start_time);
-      Serial.print ("n_stop_time"); Serial.println (n_stop_time);
-    }
-
-    // IDisplay the time every second following the start of the run from the right
-    if (n_stop_time > 0 && n_start_time == 0 && (time_now > last_display_time + display_wait))
-    {
-      run_from_right();
-    }
-    //function checks for a run from the left gate and stores the data
-    if (n_start_time > 0 && n_stop_time == 0 && (time_now > last_display_time + display_wait))
-    {
-      run_from_left();
-    }
-    // Once we have a start time and a stop time diplay the run time
-    if (n_stop_time > 0 && n_start_time > 0  && run_once == false)
-    {
-      display_run_time();
-    }
-    //
-    //resent the counters ready for the next run
-    if (n_stop_time > 0 && n_start_time > 0 && (time_now > last_display_time + run_end_delay))
-    {
-      reset_gates();
-    }
-    //If start but no 40 seconds passed then reset the counters.
-    if (run_time > reset_delay && run_once_time_out == false) {
-      time_out_reset();
-    }
-    turn_off_leds();
-    //if (Serial) MenuId = menu(); // call menu and display status = 0 sucess
-    // read the state of the pushbutton value:
-    battery_read(); //read and diaplay the battery voltage
+  //read_gates();
+  // IDisplay the time every second following the start of the run from the right
+  if (n_stop_time > 0 && n_start_time == 0 && (time_now > last_display_time + display_wait))
+  {
+    run_from_right();
+  }
+  //function checks for a run from the left gate and stores the data
+  if (n_start_time > 0 && n_stop_time == 0 && (time_now > last_display_time + display_wait))
+  {
+    run_from_left();
+  }
+  // Once we have a start time and a stop time diplay the run time
+  if (n_stop_time > 0 && n_start_time > 0  && run_once == false)
+  {
+    display_run_time();
     if (debug) {
-      bool left_gate_test = digitalRead (left_gate_pin);
-      bool right_gate_test = digitalRead (right_gate_pin);
-      if (!left_gate_test || !right_gate_test) {
-        digitalWrite(LED_BUILTIN, HIGH);
+      if (Serial) {
+        Serial.print ("n_start_time"); Serial.println(n_start_time);
+        Serial.print ("n_stop_time"); Serial.println (n_stop_time);
       }
-      else {
-        digitalWrite(LED_BUILTIN, LOW);
-      }
+    }
+  }
+  //
+  //resent the counters ready for the next run
+  if (n_stop_time > 0 && n_start_time > 0 && (time_now > last_display_time + run_end_delay))
+  {
+    reset_gates();
+  }
+  //If start but no 40 seconds passed then reset the counters.
+  if (run_time > reset_delay && run_once_time_out == false) {
+    time_out_reset();
+  }
+  turn_off_leds();
+  if (Serial) MenuId = menu(); // call menu and display status = 0 sucess
+  // read the state of the pushbutton value:
+  battery_read(); //read and diaplay the battery voltage
+  if (debug) {
+    int left_gate_test = digitalRead (left_gate_pin);
+    int right_gate_test = digitalRead (right_gate_pin);
+    if (left_gate_test == LOW || right_gate_test == LOW) {
+      digitalWrite(LED_BUILTIN, HIGH);
+    }
+    else {
+      digitalWrite(LED_BUILTIN, LOW);
     }
   }
 }
 
 
-void left_gate_triggered() //call back from easy button
-{
-  //Serial.println("left Gate Triggered");
-  ////u8x8.setCursor(0, 3);
-  ////u8x8.print("Left");;
-  //tone(speakerPin, frequency,led_interval);
-  tone(A3, 600, 200);
-  start_time[n_start_time] = millis();
-  ledState[0] = (HIGH);
-  digitalWrite(ledPin[0], ledState[0]);
-  previousMillis[0] = millis();
-  //lcd.setBacklight(60); //turn on back light
-  lcd.setRGB(runcolorR, runcolorG, runcolorB);
-  back_light_on = millis();
-  //if (Serial) Serial.println(n_start_time); if (Serial) Serial.print(start_time[n_start_time]);
-
-  if (n_start_time < 9)
-    n_start_time = n_start_time + 1;
-  else n_start_time = 9;
-}
-
-void right_gate_triggered() //call back from easy button
-{
-  //Serial.println("Right Gate Triggered")
-  ////u8x8.setCursor(6, 3);
-  ////u8x8.print("Right");;
-  //tone(speakerPin, frequency,led_interval);
-  //tone(ledPin[2], frequency,led_interval);
-  tone(A3, 440, 200);
-  stop_time[n_stop_time] = millis();
-  ledState[1] = (HIGH);
-  digitalWrite(ledPin[1], ledState[1]);
-  previousMillis[1] = millis();
-  //lcd.setBacklight(125); //turn on back light
-  lcd.setRGB(runcolorR, runcolorG, runcolorB);
-  back_light_on = millis();
-  //if (Serial) Serial.println(n_stop_time);
-  //if (Serial) Serial.println(stop_time[n_stop_time]);
-  if (n_stop_time < 9)
-    n_stop_time = n_stop_time + 1;
-  else n_stop_time = 9;
-}
-
 
 void read_gates()
 {
   digitalWrite(interupt_test_pin, HIGH);
-  left_gate.read();
-  right_gate.read();
-  digitalWrite(interupt_test_pin, HIGH);
+  //left_gate.read();
+  //right_gate.read();
+  //replace easy button with a simple pin input read and then call the call back.
+  //int left_gate = digitalRead (left_gate_pin);
+  //if (left_gate != last_left_gate) left_gate_triggered();
+  //last_left_gate = left_gate;
+  //int right_gate = digitalRead (right_gate_pin);
+  //if (right_gate != last_right_gate) right_gate_triggered();
+  //last_right_gate = right_gate;
+  //if (debug) {
+  //  Serial.println("left_gate"); Serial.println(left_gate);
+  //  Serial.println("right_gate"); Serial.println(right_gate);
+  //}
+
+  digitalWrite(interupt_test_pin, LOW);
 }
 
 void run_from_left()
