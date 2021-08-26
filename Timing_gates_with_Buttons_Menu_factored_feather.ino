@@ -399,8 +399,8 @@ void display_run_time()
   //u8x8.print(".");
   //u8x8.print(run_time_fraction);
   //u8x8.print(" ");
+  lcd.clear();
   lcd.setRGB(resultcolorR, resultcolorG, resultcolorB);
-
   lcd.setCursor(0, 0);
   lcd.print("Run Time            "); lcd.setCursor(0, 1);
   lcd.print(run_time_seconds);
