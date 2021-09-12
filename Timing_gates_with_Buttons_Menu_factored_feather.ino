@@ -5,7 +5,7 @@
 #include <EasyButton.h>
 #include "DFRobot_RGBLCD.h"
 //#include <LiquidCrystal_PCF8574.h>
-// This version has been modified to use interupts because the updating the LCD with the run time was causing the processor to miss the second gate.  
+// This version has been modified to use faster interupts because the updating the LCD with the run time was causing the processor to miss the second gate.
 
 
 
@@ -35,6 +35,13 @@ const int resultcolorR = 255;
 const int resultcolorG = 255;
 const int resultcolorB = 255;
 
+//variables for smoothing the battery voltage
+const int bat_numReadings = 10;
+int bat_readings[bat_numReadings];      // the readings from the analog input
+int bat_readIndex = 0;              // the index of the current reading
+int bat_total = 0;                  // the running total
+int bat_average = 0;                // the average
+int measuredvbat;
 
 int debounce = 10;
 bool pullup = true;
@@ -46,32 +53,36 @@ int duration = 2000;
 #define sound_length 28
 #define screen_period 800
 #define display_wait 200
-unsigned long  battery_wait = 500;
+unsigned long  battery_wait = 100;
 #define run_end_delay 3000
 #define led_interval 250 //time to leave the interval 
 unsigned long inital_reset_delay = 2500; //in 100 seconds so 6000 = 60 seconds 2500 = 25 seconds
 unsigned long reset_delay = 2500;
 
+//variable used in theeasy button call back whihc may be interupt driven.
+volatile unsigned long start_time[11];
+volatile unsigned long stop_time[11];
+volatile bool interupt_triggered_start_gate;
+volatile bool interupt_triggered_stop_gate;
+volatile int n_start_time = 0;
+volatile int n_stop_time = 0;
 
-// Variables user in timng will change:
+// Non interupt driven variables
 uint8_t presses = presses_init;
 unsigned long time_now = 0;
 unsigned long time_now_screen = 0;
 unsigned long time_now_battery = 0;
-unsigned long start_time[11];
-unsigned long stop_time[11];
-unsigned long last_stop_time = 0;
-unsigned long last_start_time = 0;
 unsigned long reset_start;
 unsigned long reset_stop;
 unsigned long last_display_time;
-int n_start_time = 0;
-int n_stop_time = 0;
 unsigned long run_time;
 int run_time_seconds;
 int run_time_fraction;
 bool run_once = false;
 bool run_once_time_out = false;
+unsigned long last_stop_time = 0;
+unsigned long last_start_time = 0;
+
 //Control the backlight
 unsigned long batt_last_read = 12000;
 unsigned long back_light_on = 0;
@@ -94,56 +105,77 @@ FlashStorage(reset_delay_storage, unsigned long);
 void left_button_ISR()
 {
   left_gate.read();
-  if (debug)Serial.println("left Gate interupt");
+  if (debug)Serial.println("Left gate interupt");
 }
 
 void right_button_ISR()
 {
   right_gate.read();
-  if (debug) Serial.println("right Gate interupt");
+  if (debug) Serial.println("Right gate interupt");
 }
 
-void left_gate_triggered() //call back from easy button
+void left_gate_triggered() //call back from easy button may be interupt driven so keep as short as possible.
 {
-   //if (debug){Serial.println("left Gate Triggered");}
-  ////u8x8.setCursor(0, 3);
-  ////u8x8.print("Left");;
-  //tone(speakerPin, frequency,led_interval);
-  //tone(A3, 600, 200);
+  if (debug) {
+    Serial.println("Left Gate Call Back Triggered");
+  }
+  interupt_triggered_start_gate = true;
   start_time[n_start_time] = millis();
-  ledState[0] = (HIGH);
-  digitalWrite(ledPin[0], ledState[0]);
-  previousMillis[0] = millis();
-  //lcd.setBacklight(60); //turn on back light
-  lcd.setRGB(runcolorR, runcolorG, runcolorB);
-  back_light_on = millis();
-  //if (Serial) Serial.println(n_start_time); if (Serial) Serial.print(start_time[n_start_time]);
-
   if (n_start_time < 9)
     n_start_time = n_start_time + 1;
   else n_start_time = 9;
 }
-
-void right_gate_triggered() //call back from easy button
+void right_gate_triggered() //call back from easy button may be interupt driven so keep it short
 {
-  if (debug){Serial.println("Right Gate Triggered");}
-  ////u8x8.setCursor(6, 3);
-  ////u8x8.print("Right");;
-  //tone(speakerPin, frequency,led_interval);
-  //tone(ledPin[2], frequency,led_interval);
-  tone(A3, 440, 200);
+  if (debug) {
+    Serial.println("Right Gate Call Back Triggered");
+  }
+  interupt_triggered_stop_gate = true;
   stop_time[n_stop_time] = millis();
-  ledState[1] = (HIGH);
-  digitalWrite(ledPin[1], ledState[1]);
-  previousMillis[1] = millis();
-  //lcd.setBacklight(125); //turn on back light
-  lcd.setRGB(runcolorR, runcolorG, runcolorB);
-  back_light_on = millis();
-  //if (Serial) Serial.println(n_stop_time);
-  //if (Serial) Serial.println(stop_time[n_stop_time]);
   if (n_stop_time < 9)
     n_stop_time = n_stop_time + 1;
   else n_stop_time = 9;
+}
+
+void left_gate_status_up_date() //This funcion tuen on the LEF and beeps the buzzer.
+{
+  if (debug) {
+    Serial.println("Left gate status update");
+  }
+  //tone(speakerPin, frequency,led_interval);
+  interupt_triggered_start_gate = false;
+  tone(A3, 600, 200);
+  ledState[0] = (HIGH);
+  digitalWrite(ledPin[0], ledState[0]);
+  previousMillis[0] = millis();
+  lcd.setRGB(runcolorR, runcolorG, runcolorB);
+  back_light_on = millis();
+  if (debug) {
+    Serial.print ("n_start_time: ");
+    Serial.print(n_start_time - 1);
+    Serial.print ("time: ");
+    Serial.println(start_time[n_start_time - 1]);
+  }
+}
+
+void right_gate_status_up_date() //call back from easy button
+{
+  if (debug) {
+    Serial.println("Right gate status update");
+  }
+  interupt_triggered_stop_gate = false;
+  tone(A3, 440, 200);
+  ledState[1] = (HIGH);
+  digitalWrite(ledPin[1], ledState[1]);
+  previousMillis[1] = millis();
+  lcd.setRGB(runcolorR, runcolorG, runcolorB);
+  back_light_on = millis();
+  if (debug) {
+    Serial.print ("n_stop_time: ");
+    Serial.print(n_stop_time - 1);
+    Serial.print ("time: ");
+    Serial.println(stop_time[n_stop_time - 1]);
+  }
 }
 
 void setup() {
@@ -155,7 +187,7 @@ void setup() {
   Serial.setTimeout(100000);
   pinMode(LED_BUILTIN, OUTPUT);
 
-  tone(A3, 600, 200);
+  tone(A3, 600, 400);
   // initialize the LED pin as an output:
   //Begin easy button for the gates
 
@@ -169,12 +201,16 @@ void setup() {
   if (right_gate.supportsInterrupt())
   {
     right_gate.enableInterrupt(right_button_ISR);
-   if (debug){ if (Serial) Serial.println("Button will be used through interrupts");}
+    if (debug) {
+      if (Serial) Serial.println("Button will be used through interrupts");
+    }
   }
   if (left_gate.supportsInterrupt())
   {
     left_gate.enableInterrupt(left_button_ISR);
-   if (debug){ if (Serial) Serial.println("Button will be used through interrupts");}
+    if (debug) {
+      if (Serial) Serial.println("Button will be used through interrupts");
+    }
   }
 
   //u8x8.begin();
@@ -218,9 +254,11 @@ void setup() {
   lcd.setCursor(0, 1);
   lcd.print("Trig pulses:"); lcd.print(presses);
   //Add the callback function to be called when the button is pressed for at least the given time.
-
-  //left_gate.onPressed(left_gate_triggered);
-  //right_gate.onPressed(right_gate_triggered);
+  // initialize all the battery readings to  inital reading:
+  battery_read(); // read the battery inital value
+  for (int bat_thisReading = 0; bat_thisReading <= bat_numReadings; bat_thisReading++) {
+    bat_readings[bat_thisReading] = 0;
+  }
   delay(500);
   lcd.home(); lcd.clear();
   lcd.setCursor(0, 0);
@@ -234,6 +272,8 @@ void setup() {
 void loop() {
   time_now = millis();
   //read_gates();
+  if (interupt_triggered_start_gate) left_gate_status_up_date();
+  if (interupt_triggered_stop_gate) right_gate_status_up_date();
   // IDisplay the time every second following the start of the run from the right
   if (n_stop_time > 0 && n_start_time == 0 && (time_now > last_display_time + display_wait))
   {
@@ -322,16 +362,6 @@ void run_from_left()
   lcd.print(".");
   lcd.print(run_time_fraction);
   lcd.print("  ");
-  //u8x8.clearLine(0);
-  //u8x8.setCursor(0, 0);
-  //u8x8.print("Run from left");
-  //u8x8.clearLine(1);
-  //u8x8.clearLine(2);
-  //u8x8.setCursor(0, 1);
-  //u8x8.print(run_time_seconds);
-  //u8x8.print(".");
-  //u8x8.print(run_time_fraction);
-  //u8x8.print("  ");
   last_display_time = time_now;
   run_once_time_out = false;
 }
@@ -354,16 +384,6 @@ void run_from_right()
   lcd.print(".");
   lcd.print(run_time_fraction);
   lcd.print("  ");
-  //u8x8.clearLine(0);
-  //u8x8.setCursor(0, 0);
-  //u8x8.print("Run from right");
-  //u8x8.clearLine(1);
-  //u8x8.clearLine(2);
-  //u8x8.setCursor(0, 1);
-  //u8x8.print(run_time_seconds);
-  //u8x8.print(".");
-  //u8x8.print(run_time_fraction);
-  //u8x8.print("  ");
   last_display_time = time_now;
   run_once_time_out = false;
 }
@@ -393,13 +413,7 @@ void display_run_time()
   if (Serial) Serial.print(run_time_seconds);
   if (Serial) Serial.print(".");
   if (Serial) Serial.println(run_time_fraction);
-  //u8x8.clearLine(1);
-  //u8x8.setCursor(0, 1);
-  //u8x8.print(run_time_seconds);
-  //u8x8.print(".");
-  //u8x8.print(run_time_fraction);
-  //u8x8.print(" ");
-  lcd.clear();
+  //lcd.clear();
   lcd.setRGB(resultcolorR, resultcolorG, resultcolorB);
   lcd.setCursor(0, 0);
   lcd.print("Run Time            "); lcd.setCursor(0, 1);
@@ -414,7 +428,7 @@ void reset_gates() {
   n_stop_time = 0;
   n_start_time = 0;
   run_once = false;
-  tone(A3, 350, 400);
+  tone(A3, 300, 400);
   previousMillis[2] = millis();
   ledState[0] = (HIGH);
   digitalWrite(ledPin[0], ledState[0]);
@@ -484,7 +498,7 @@ void battery_read()
   if (millis() > (time_now_battery +  battery_wait ))
   {
     time_now_battery = millis();
-    int measuredvbat = analogRead(VBATPIN);
+    measuredvbat = analogRead(VBATPIN);
     //measuredvbat *= 2;    // we divided by 2, so multiply back
     //measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage minimun 2 volts
     //measuredvbat /= 1024; // convert to voltage
@@ -493,9 +507,25 @@ void battery_read()
     //  max 100*(651 - 496) / 155 = 100
     // 100 (496 - 496) / 155 =0
     measuredvbat = 100 * (measuredvbat - 496) / 155;
+    // subtract the last reading:
+    bat_total = bat_total - bat_readings[bat_readIndex];
+    // read from the sensor:
+    bat_readings[bat_readIndex] = measuredvbat;
+    // add the reading to the total:
+    bat_total = bat_total + bat_readings[bat_readIndex];
+    // advance to the next position in the array:
+    bat_readIndex = bat_readIndex + 1;
+
+    // if we're at the end of the array...
+    if (bat_readIndex >= bat_numReadings) {
+      // ...wrap around to the beginning:
+      bat_readIndex = 0;
+    }
+
+    // calculate the average:
+    bat_average = bat_total / bat_numReadings;
     lcd.setCursor(12, 1);
-    //lcd.print("VBat:" );
-    lcd.print(measuredvbat); lcd.print("%" );
+    lcd.print(bat_average); lcd.print("%" );
   }
 }
 
